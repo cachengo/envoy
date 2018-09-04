@@ -8,6 +8,9 @@ load(":patched_http_archive.bzl", "patched_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
 load(":target_recipes.bzl", "TARGET_RECIPES")
 
+# dict of {build recipe name: longform extension name,}
+PPC_SKIP_TARGETS = {"luajit": "envoy.filters.http.lua"}
+
 def _repository_impl(name, **kwargs):
     # `existing_rule_keys` contains the names of repositories that have already
     # been defined in the Bazel workspace. By skipping repos with existing keys,
@@ -60,13 +63,16 @@ def _repository_impl(name, **kwargs):
                 **kwargs)
 
 def _build_recipe_repository_impl(ctxt):
+    # modify the recipes list based on the build context
+    recipes = _apply_dep_blacklist(ctxt, ctxt.attr.recipes)
+
     # Setup the build directory with links to the relevant files.
     ctxt.symlink(Label("//bazel:repositories.sh"), "repositories.sh")
     ctxt.symlink(Label("//ci/build_container:build_and_install_deps.sh"),
                  "build_and_install_deps.sh")
     ctxt.symlink(Label("//ci/build_container:recipe_wrapper.sh"), "recipe_wrapper.sh")
     ctxt.symlink(Label("//ci/build_container:Makefile"), "Makefile")
-    for r in ctxt.attr.recipes:
+    for r in recipes:
         ctxt.symlink(Label("//ci/build_container/build_recipes:" + r + ".sh"),
                      "build_recipes/" + r + ".sh")
     ctxt.symlink(Label("//ci/prebuilt:BUILD"), "BUILD")
@@ -75,7 +81,7 @@ def _build_recipe_repository_impl(ctxt):
     environment = {}
     print("Fetching external dependencies...")
     result = ctxt.execute(
-        ["./repositories.sh"] + ctxt.attr.recipes,
+        ["./repositories.sh"] + recipes,
         environment = environment,
         quiet = False,
     )
@@ -208,6 +214,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
         name = "envoy_deps",
         recipes = recipes.to_list(),
     )
+
     for t in TARGET_RECIPES:
         if t not in skip_targets:
             native.bind(
@@ -464,3 +471,19 @@ def _com_github_google_jwt_verify():
       name = "jwt_verify_lib",
       actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
     )
+
+def _apply_dep_blacklist(ctxt, recipes):
+    newlist = []
+    skip_list = dict()
+    if _is_linux_ppc_or_aarch64(ctxt):
+        skip_list = PPC_SKIP_TARGETS
+    for t in recipes:
+        if t not in skip_list.keys():
+            newlist.append(t)
+    return newlist
+
+def _is_linux_ppc_or_aarch64(ctxt):
+    if ctxt.os.name != "linux":
+        return False
+    res = ctxt.execute(["uname", "-m"])
+    return "ppc" in res.stdout or "aarch64" in res.stdout

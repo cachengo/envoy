@@ -36,6 +36,16 @@ genrule(
 )
 
 config_setting(
+    name = "linux_ppc",
+    values = {"cpu": "ppc"},
+)
+
+config_setting(
+    name = "linux_aarch64",
+    values = {"cpu": "aarch64"},
+)
+
+config_setting(
     name = "opt_build",
     values = {"compilation_mode": "opt"},
 )
