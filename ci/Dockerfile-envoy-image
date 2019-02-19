@@ -1,7 +1,102 @@
-FROM ubuntu:14.04
+FROM ubuntu:18.04 as build
 
-ADD build_release/envoy /usr/local/bin/envoy
-RUN apt-get update && apt-get install -y \
-    build-essential
-RUN strip /usr/local/bin/envoy
-RUN apt-get purge -y build-essential
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends software-properties-common \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN add-apt-repository -y ppa:openjdk-r/ppa \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        automake \
+        build-essential \
+        bc \
+        cmake \
+        curl \
+        gdb \
+        git \
+        golang \
+        gnupg-agent \
+        libtool \
+        libssl-dev \
+        make \
+        mlocate \
+        ninja-build \
+        openjdk-8-jdk \
+        openjdk-8-jre-headless \
+        pkg-config \
+        python \
+        python-pip \
+        python3 \
+        python3-pip \
+        strace \
+        tshark \
+        tcpdump \
+        time \
+        unzip \
+        wget \
+        wireshark \
+        zip \
+    && updatedb \
+    && apt-get install -y ca-certificates-java \
+    && update-ca-certificates -f \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
+    && apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-7 main" \
+    && apt-get update \
+    && apt-get install -y clang-7 clang-format-7 clang-tidy-7 lld-7 libc++-7-dev libc++abi-7-dev \
+    && add-apt-repository -y ppa:ubuntu-toolchain-r/test \
+    && apt update \
+    && apt install -y g++-7 \
+    && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 1000 \
+    && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 1000 \
+    && update-alternatives --config gcc \
+    && update-alternatives --config g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV BAZEL_VERSION=0.5.2
+
+RUN mkdir -p /bazel \
+    && cd /bazel \
+    && curl -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-dist.zip \
+    && unzip bazel-$BAZEL_VERSION-dist.zip \
+    && patch -p1 < <(curl https://github.com/bazelbuild/bazel/commit/860af5be10b6bad68144d9d2d34173e86b40268c.patch) \
+    && env EXTRA_BAZEL_ARGS="--host_javabase=@local_jdk//:jdk" bash ./compile.sh \
+    && cp output/bazel /usr/local/bin \
+    && chmod 755 /usr/bin/bazel \
+    && rm -rf /bazel
+
+COPY . /envoy
+
+RUN cd /envoy \
+    && bazel --output_base=/root/build --output_user_root=/root/tmp build //source/exe:envoy-static
+
+RUN LOCATION=$(readlink /envoy/bazel-bin) \
+    && cp ${LOCATION}/source/exe/envoy-static /root/build/envoy-static
+
+FROM ubuntu:18.04
+
+ARG dumbinit_version=1.2.1-1
+ENV loglevel=info
+
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y wget ca-certificates dumb-init=${dumbinit_version} \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /tmp/* /var/tmp/* \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /etc/envoy
+
+COPY --from=build /root/build/envoy-static /usr/local/bin/envoy
+
+ADD configs/google_com_proxy.v2.yaml /etc/envoy/envoy.yaml
+
+EXPOSE 10000
+
+ENTRYPOINT ["dumb-init", "--"]
+CMD /usr/local/bin/envoy --v2-config-only -l $loglevel -c /etc/envoy/envoy.yaml
