@@ -59,6 +59,7 @@ def _envoy_stamped_linkopts():
     #
     # /usr/bin/ld.gold: internal error in write_build_id, at ../../gold/layout.cc:5419
     "@envoy//bazel:coverage_build": [],
+    "@envoy//bazel:opt_build": [],
 
     # MacOS doesn't have an official equivalent to the `.note.gnu.build-id`
     # ELF section, so just stuff the raw ID into a new text section.
