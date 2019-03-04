@@ -57,7 +57,7 @@ RUN wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
     && update-alternatives --config g++ \
     && rm -rf /var/lib/apt/lists/*
 
-ENV BAZEL_VERSION=0.20.0
+ENV BAZEL_VERSION=0.19.2
 
 RUN mkdir -p /bazel \
     && cd /bazel \
