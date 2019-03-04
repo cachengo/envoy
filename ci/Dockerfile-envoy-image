@@ -70,7 +70,7 @@ RUN mkdir -p /bazel \
 COPY . /envoy
 
 RUN cd /envoy \
-    && bazel --output_base=/root/build --output_user_root=/root/tmp build //source/exe:envoy-static
+    && bazel --output_base=/root/build --output_user_root=/root/tmp build -c opt //source/exe:envoy-static.stripped
 
 RUN LOCATION=$(readlink /envoy/bazel-bin) \
     && cp ${LOCATION}/source/exe/envoy-static /root/build/envoy-static
