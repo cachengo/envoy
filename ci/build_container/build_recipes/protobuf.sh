@@ -8,9 +8,9 @@ set -e
 [ -z "$ENVOY_PROTOBUF_COMMIT" ] && ENVOY_PROTOBUF_COMMIT=062df3d0724d9ae5e3c65d481dc1d3aca811152e  # 2017-07-20
 
 git clone https://github.com/google/protobuf.git
-rsync -av protobuf/* $THIRDPARTY_SRC/protobuf
 cd protobuf
 git reset --hard "$ENVOY_PROTOBUF_COMMIT"
+rsync -av * $THIRDPARTY_SRC/protobuf
 ./autogen.sh
 ./configure --prefix=$THIRDPARTY_BUILD --enable-shared=no
 make V=1 install
