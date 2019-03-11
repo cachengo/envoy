@@ -63,7 +63,7 @@ RUN mkdir -p /bazel \
     && cd /bazel \
     && curl -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-dist.zip \
     && unzip bazel-$BAZEL_VERSION-dist.zip \
-    && curl https://github.com/bazelbuild/bazel/commit/860af5be10b6bad68144d9d2d34173e86b40268c.patch) | patch -p1 \
+    && curl https://github.com/bazelbuild/bazel/commit/860af5be10b6bad68144d9d2d34173e86b40268c.patch | patch -p1 \
     && env EXTRA_BAZEL_ARGS="--host_javabase=@local_jdk//:jdk" bash ./compile.sh \
     && cp output/bazel /usr/local/bin \
     && chmod 755 /usr/bin/bazel \
